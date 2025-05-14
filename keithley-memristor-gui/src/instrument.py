@@ -29,13 +29,20 @@ class Instrument:
 
     def connect(self, resource_name):
         if self.simulation_mode:
-            return "KEITHLEY INSTRUMENTS INC.,MODEL 2602,1398687,3.0.0"
+            return "KEITHLEY INSTRUMENTS INC.,MODEL 2602,1398687,3.0.0 (SIMULATION)"
+            
         try:
+            # Check if we're using pyvisa-py backend
+            using_pyvisa_py = '@py' in str(self.rm._visalib)
+            
             self.instrument = self.rm.open_resource(resource_name)
             # Set appropriate timeout and termination characters
             self.instrument.timeout = 10000  # 10 seconds
             self.instrument.write_termination = '\n'
             self.instrument.read_termination = '\n'
+            
+            # Print backend information for diagnostics
+            print(f"Connected using backend: {'PyVISA-py' if using_pyvisa_py else 'NI-VISA or other vendor implementation'}")
             
             # Reset the instrument and clear buffers
             self.instrument.write("reset()")

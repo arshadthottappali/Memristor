@@ -98,9 +98,9 @@ class KeithleyMemristorGUI:
             backend = '@py'  # Default to pyvisa-py
             if not use_simulation:
                 backend_choice = messagebox.askquestion("Backend Selection",
-                                                      "Would you like to try the NI-VISA backend?\n\n"
-                                                      "Choose 'Yes' for NI-VISA (if installed)\n"
-                                                      "Choose 'No' for PyVISA-py (pure Python)")
+                                                      "Which VISA backend would you like to use?\n\n"
+                                                      "Choose 'No' for PyVISA-py (pure Python, no vendor libraries needed)\n"
+                                                      "Choose 'Yes' for NI-VISA or other vendor implementation (if installed)")
                 if backend_choice == 'yes':
                     backend = ''  # Empty string means NI-VISA
         

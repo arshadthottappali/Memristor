@@ -36,11 +36,20 @@ pip install -r requirements.txt
 
 ### Windows-Specific Setup
 
-When running on Windows 11, please follow these additional steps:
+When running on Windows 11, you can use a pure Python approach (no vendor libraries needed) or install vendor drivers:
 
-1. **Install NI-VISA Driver**:
-   - Download and install the [NI-VISA driver](https://www.ni.com/en-us/support/downloads/drivers/download.ni-visa.html)
-   - This provides the necessary backend to communicate with GPIB devices
+1. **Pure Python Approach (Recommended)**:
+   - No need to install vendor VISA libraries
+   - Install the required Python packages:
+     ```
+     pip install pyvisa pyvisa-py
+     ```
+   - Install the appropriate GPIB interface library for your hardware:
+     ```
+     pip install gpib-ctypes  # For NI GPIB adapters
+     # OR
+     pip install prologix-gpib-ethernet  # For Prologix adapters
+     ```
 
 2. **GPIB Interface Hardware**:
    - Ensure your GPIB interface hardware (such as a NI GPIB-USB-HS adapter) is properly connected

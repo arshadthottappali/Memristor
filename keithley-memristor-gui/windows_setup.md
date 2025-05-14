@@ -18,17 +18,45 @@ This guide provides detailed instructions for setting up the Keithley Memristor 
    python --version
    ```
 
-## Step 2: Install the VISA Driver
+## Step 2: VISA Implementation Options
 
-The application requires a VISA (Virtual Instrument Software Architecture) implementation to communicate with GPIB devices. For Windows, you have two options:
+The application requires a VISA (Virtual Instrument Software Architecture) implementation to communicate with GPIB devices. You have three options:
 
-### Option 1: National Instruments VISA (Recommended)
+### Option 1: Use PyVISA-py (No Additional Installation Required)
+
+This option uses the pure Python backend for PyVISA (`pyvisa-py`), which is automatically installed when you install the application's requirements.
+
+**Benefits:**
+- No need to install vendor-specific VISA libraries like NI-VISA or IO Libraries Suite
+- Works with many GPIB adapters through Python libraries
+- Simpler installation process
+
+**Setup Steps:**
+1. Install the PyVISA and PyVISA-py packages:
+   ```
+   pip install pyvisa pyvisa-py
+   ```
+
+2. Install the appropriate Python package for your GPIB hardware:
+   - For NI GPIB adapters: `pip install gpib-ctypes`
+   - For Prologix GPIB adapters: `pip install prologix-gpib-ethernet`
+   - For Linux-GPIB compatible adapters: `pip install linux-gpib`
+
+3. When connecting in the application:
+   - Select "No" when prompted to use the NI-VISA backend
+   - This ensures the application uses the pure Python PyVISA-py backend
+
+### Option 2: National Instruments VISA (Better Hardware Support)
+
+If the pure Python option doesn't work with your hardware, you can install NI-VISA:
 
 1. Download NI-VISA from [National Instruments](https://www.ni.com/en-us/support/downloads/drivers/download.ni-visa.html)
 2. Install the package, following the on-screen instructions
 3. Restart your computer after installation
 
-### Option 2: Keysight/Agilent IO Libraries
+### Option 3: Keysight/Agilent IO Libraries
+
+An alternative vendor implementation:
 
 1. Download the IO Libraries Suite from [Keysight](https://www.keysight.com/find/iosuite)
 2. Install the package, following the on-screen instructions
@@ -91,6 +119,10 @@ The application requires a VISA (Virtual Instrument Software Architecture) imple
 3. **VISA Implementation Issues**
    - Click the "Diagnostics" button in the application to see detailed information about available VISA backends
    - In the connection dialog, try switching between VISA backends (NI-VISA and PyVISA-py)
+   - For PyVISA-py issues:
+     - Ensure you have installed the correct Python package for your GPIB hardware
+     - Run `python -m pyvisa.cmd info` in the command prompt to get detailed PyVISA diagnostic information
+     - Try running with verbose output: `python -m pyvisa.cmd list --debug`
 
 4. **Windows Device Manager**
    - Open Windows Device Manager to check if the GPIB hardware is properly detected
@@ -98,10 +130,26 @@ The application requires a VISA (Virtual Instrument Software Architecture) imple
 
 ### Python Module Issues
 
-If you encounter errors about missing modules:
+If you encounter errors about missing modules, install the core requirements and GPIB interface dependencies:
 
 ```
-pip install pyvisa pyvisa-py matplotlib numpy pandas pywin32
+# Core application requirements
+pip install pyvisa pyvisa-py matplotlib numpy pandas
+
+# For Windows-specific features
+pip install pywin32
+
+# Choose the appropriate GPIB interface library based on your hardware
+pip install gpib-ctypes  # For NI GPIB adapters
+# OR
+pip install prologix-gpib-ethernet  # For Prologix GPIB adapters
+# OR
+pip install linux-gpib  # For Linux-GPIB compatible adapters
+```
+
+For additional debugging tools, you can install:
+```
+pip install pyvisa-sim  # For VISA simulation capabilities
 ```
 
 ### Permission Issues

@@ -31,8 +31,18 @@ def test_windows_gpib_connection(address="GPIB::26::INSTR"):
         print("- PyVISA version: Unknown (module not imported correctly)")
     print()
 
+    # Try PyVISA-py (pure Python backend)
+    print("\n(1) Trying PyVISA-py (pure Python backend)...")
+    try:
+        rm = pyvisa.ResourceManager('@py')
+        print(f"- Using PyVISA-py backend")
+        print(f"- Available resources: {rm.list_resources()}")
+        test_connection(rm, address)
+    except Exception as e:
+        print(f"- Error: {str(e)}")
+        
     # Try default VISA implementation
-    print("\n(1) Trying default VISA implementation...")
+    print("\n(2) Trying default VISA implementation...")
     try:
         rm = pyvisa.ResourceManager()
         print(f"- VISA DLL path: {rm.visalib.library_path}")
@@ -57,7 +67,7 @@ def test_windows_gpib_connection(address="GPIB::26::INSTR"):
     ]
     
     # Try each VISA DLL path
-    for i, dll_path in enumerate(visa_dlls, 2):
+    for i, dll_path in enumerate(visa_dlls, 3):
         print(f"\n({i}) Trying VISA DLL at: {dll_path}")
         if not os.path.exists(dll_path):
             print(f"- DLL not found at this location")
@@ -72,10 +82,14 @@ def test_windows_gpib_connection(address="GPIB::26::INSTR"):
             print(f"- Error: {str(e)}")
     
     print("\n\nTroubleshooting tips for Windows:")
-    print("1. Ensure you have installed the proper VISA implementation:")
+    print("1. Pure Python approach (no vendor libraries needed):")
+    print("   - Make sure pyvisa-py is installed: pip install pyvisa-py")
+    print("   - For NI GPIB hardware: pip install gpib-ctypes")
+    print("   - For Prologix GPIB hardware: pip install prologix-gpib-ethernet")
+    print("2. Alternative: Install a vendor VISA implementation:")
     print("   - NI-VISA: https://www.ni.com/en-us/support/downloads/drivers/download.ni-visa.html")
     print("   - Keysight IO Libraries: https://www.keysight.com/find/iosuite")
-    print("2. Make sure your GPIB adapter is properly connected and drivers installed")
+    print("3. Make sure your GPIB adapter is properly connected and drivers installed")
     print("3. Check Windows Device Manager for any issues with GPIB hardware")
     print("4. Try using the NI Measurement & Automation Explorer (NI MAX) to verify the instrument is visible")
     print("5. Verify the instrument is set to GPIB address 26 (or update the script with the correct address)")
