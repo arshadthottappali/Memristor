@@ -1,4 +1,4 @@
-from tkinter import Tk, Label, Entry, Button, StringVar, messagebox, Frame
+from tkinter import Tk, Label, Entry, Button, StringVar, messagebox, Frame, Toplevel
 from tkinter.filedialog import asksaveasfilename
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -45,11 +45,12 @@ class KeithleyMemristorGUI:
         Button(self.master, text="Connect", command=self.connect_instrument).grid(row=0, column=2)
         Button(self.master, text="List Resources", command=self.list_resources).grid(row=0, column=3)
         Button(self.master, text="Self-Test", command=self.run_self_test).grid(row=0, column=4)
+        Button(self.master, text="Diagnostics", command=self.run_diagnostics).grid(row=0, column=5)
         
         # Add status indicator with colored background
         self.status_label = Label(self.master, textvariable=self.connection_status, 
                             bg="red", fg="white", width=15)
-        self.status_label.grid(row=0, column=5, padx=10)
+        self.status_label.grid(row=0, column=6, padx=10)
 
         Label(self.master, text="Start Voltage (V):").grid(row=1, column=0)
         Entry(self.master, textvariable=self.start_voltage).grid(row=1, column=1)
@@ -92,9 +93,20 @@ class KeithleyMemristorGUI:
                                            "Do you want to use simulation mode?\n\n"
                                            "Select 'Yes' for simulation without hardware.\n"
                                            "Select 'No' to connect to actual hardware.")
+            
+            # Choose backend based on available diagnostics
+            backend = '@py'  # Default to pyvisa-py
+            if not use_simulation:
+                backend_choice = messagebox.askquestion("Backend Selection",
+                                                      "Would you like to try the NI-VISA backend?\n\n"
+                                                      "Choose 'Yes' for NI-VISA (if installed)\n"
+                                                      "Choose 'No' for PyVISA-py (pure Python)")
+                if backend_choice == 'yes':
+                    backend = ''  # Empty string means NI-VISA
         
-            self.instrument = Instrument(simulation_mode=use_simulation)
-            idn = self.instrument.connect(self.gpib_address.get() or "GPIB::24::INSTR")
+            self.instrument = Instrument(simulation_mode=use_simulation, backend=backend)
+            # Use GPIB address 26 as default
+            idn = self.instrument.connect(self.gpib_address.get() or "GPIB::26::INSTR")
             
             # Update status indicator
             if use_simulation:
@@ -114,7 +126,7 @@ class KeithleyMemristorGUI:
                 messagebox.showerror(
                     "Connection Error",
                     "Invalid GPIB resource name specified.\n"
-                    "Ensure the GPIB address is in the correct format (e.g., GPIB::24::INSTR).\n"
+                    "Ensure the GPIB address is in the correct format (e.g., GPIB::26::INSTR).\n"
                     "You can also use the 'List Resources' feature to find available instruments."
                 )
             else:
@@ -123,19 +135,56 @@ class KeithleyMemristorGUI:
     def list_resources(self):
         try:
             import pyvisa
+            backends = []
+            resources = []
+            error_messages = []
+            
+            # Try pyvisa-py backend
             try:
-                # Try pure Python backend first
-                rm = pyvisa.ResourceManager('@py')
-            except Exception:
-                # Fall back to system VISA
-                rm = pyvisa.ResourceManager()
+                backends.append("@py")
+                rm_py = pyvisa.ResourceManager('@py')
+                resources_py = rm_py.list_resources()
+                if resources_py:
+                    resources.extend(resources_py)
+                    message = f"PyVISA-py backend found {len(resources_py)} resources"
+                else:
+                    message = "PyVISA-py backend found no resources"
+                error_messages.append(message)
+                print(message)
+            except Exception as e:
+                backends.append("@py (failed)")
+                message = f"PyVISA-py backend error: {str(e)}"
+                error_messages.append(message)
+                print(message)
                 
-            resources = rm.list_resources()
+            # Try system backend (NI-VISA)
+            try:
+                backends.append("system")
+                rm_sys = pyvisa.ResourceManager("")
+                resources_sys = rm_sys.list_resources()
+                if resources_sys:
+                    resources.extend(resources_sys)
+                    message = f"System backend found {len(resources_sys)} resources"
+                else:
+                    message = "System backend found no resources"
+                error_messages.append(message)
+                print(message)
+            except Exception as e:
+                backends.append("system (failed)")
+                message = f"System backend error: {str(e)}"
+                error_messages.append(message)
+                print(message)
+            
+            # Show results
             if resources:
                 messagebox.showinfo("Available Resources", 
-                                    f"Connected instruments:\n{', '.join(resources)}")
+                                   f"Connected instruments:\n{', '.join(resources)}\n\n"
+                                   f"Backends tested: {', '.join(backends)}")
             else:
-                messagebox.showinfo("Available Resources", "No instruments found.")
+                messagebox.showinfo("Available Resources", 
+                                   f"No instruments found.\n\n"
+                                   f"Backends tested: {', '.join(backends)}\n\n"
+                                   f"Debug info:\n{'; '.join(error_messages)}")
         except Exception as e:
             messagebox.showerror("Error", 
                                 f"Failed to list resources: {str(e)}\n"
@@ -359,6 +408,87 @@ class KeithleyMemristorGUI:
         except Exception as e:
             messagebox.showerror("Self-Test Error", f"Failed to run self-test: {str(e)}")
         finally:
+            self.master.config(cursor="")
+
+    def run_diagnostics(self):
+        """Run detailed diagnostics on GPIB connection"""
+        try:
+            # Show wait cursor
+            self.master.config(cursor="wait")
+            self.master.update()
+            
+            # Run diagnostics
+            results = Instrument.get_available_resources()
+            
+            # Also check Windows-specific resources
+            windows_results = Instrument.get_windows_specific_resources()
+            
+            # Create a detailed diagnostic report
+            report = f"GPIB Connection Diagnostics\n"
+            report += f"========================\n\n"
+            report += f"Date: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            report += f"OS: {results['os_info']}\n"
+            report += f"Python: {results['python_version']}\n"
+            report += f"PyVISA: {results['diagnostics'].get('pyvisa_version', 'Unknown')}\n\n"
+            
+            report += f"Backends Available:\n"
+            report += f"- " + "\n- ".join(results["available_backends"]) if results["available_backends"] else "None detected"
+            report += "\n\n"
+            
+            report += f"Resources Found: {len(results['resources'])}\n"
+            for i, resource in enumerate(results["resources"]):
+                report += f"{i+1}. {resource}\n"
+            if not results["resources"]:
+                report += "No resources found.\n"
+            report += "\n"
+            
+            report += f"Diagnostic Details:\n"
+            for key, value in results["diagnostics"].items():
+                report += f"- {key}: {value}\n"
+                
+            # Add Windows-specific information
+            report += f"\nWindows-Specific Diagnostics:\n"
+            report += f"Is Windows: {windows_results['is_windows']}\n"
+            
+            if windows_results['is_windows']:
+                report += f"Windows VISA backends tried: {', '.join(windows_results['backends_tried'])}\n"
+                report += f"Windows resources found: {len(windows_results['resources'])}\n"
+                for i, resource in enumerate(windows_results['resources']):
+                    report += f"  {i+1}. {resource}\n"
+                    
+                if 'working_dll' in windows_results:
+                    report += f"Working VISA DLL: {windows_results['working_dll']}\n"
+            
+            # Display in a scrollable text window
+            diagnostic_window = Toplevel(self.master)
+            diagnostic_window.title("GPIB Diagnostics")
+            diagnostic_window.geometry("600x400")
+            
+            from tkinter import scrolledtext
+            text_area = scrolledtext.ScrolledText(diagnostic_window, wrap="word")
+            text_area.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            text_area.insert("1.0", report)
+            text_area.config(state="disabled")  # Make read-only
+            
+            # Add save button
+            def save_report():
+                filename = asksaveasfilename(
+                    defaultextension=".txt",
+                    filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+                    title="Save Diagnostic Report"
+                )
+                if filename:
+                    with open(filename, "w") as f:
+                        f.write(report)
+                    messagebox.showinfo("Success", f"Diagnostic report saved to {filename}")
+                    
+            Button(diagnostic_window, text="Save Report", command=save_report).pack(pady=10)
+            
+        except Exception as e:
+            messagebox.showerror("Diagnostic Error", f"Failed to run diagnostics: {str(e)}")
+        finally:
+            # Restore cursor
             self.master.config(cursor="")
 
     def on_closing(self):

@@ -2,15 +2,28 @@ import pyvisa
 import numpy as np
 import time
 import random
+import sys
+import os
 
 class Instrument:
-    def __init__(self, simulation_mode=False):
+    def __init__(self, simulation_mode=False, backend='@py'):
         self.simulation_mode = simulation_mode
         if not simulation_mode:
             try:
-                self.rm = pyvisa.ResourceManager('@py')
-            except Exception:
-                self.rm = pyvisa.ResourceManager()
+                # Try with specified backend
+                self.rm = pyvisa.ResourceManager(backend)
+                print(f"Using PyVISA backend: {backend}")
+            except Exception as e:
+                print(f"Failed to use backend {backend}: {str(e)}")
+                # Try alternate backend
+                try:
+                    alt_backend = "" if backend == "@py" else "@py"
+                    self.rm = pyvisa.ResourceManager(alt_backend) 
+                    print(f"Using alternate backend: {alt_backend}")
+                except Exception:
+                    # Last resort - default backend
+                    print("Using default backend")
+                    self.rm = pyvisa.ResourceManager()
         self.instrument = None
         self.current_voltage = 0
 
@@ -197,3 +210,123 @@ class Instrument:
                 return f"Self-test failed with code: {result}"
         except Exception as e:
             return f"Self-test failed: {str(e)}"
+
+    @staticmethod
+    def get_available_resources():
+        """
+        Static method to get all available resources with detailed diagnostic info
+        Returns a dictionary with diagnostic information
+        """
+        import pyvisa
+        import sys
+        import os
+        
+        result = {
+            "available_backends": [],
+            "resources": [],
+            "diagnostics": {},
+            "os_info": sys.platform,
+            "python_version": sys.version,
+            "environment": {}
+        }
+        
+        # Get relevant environment variables
+        env_vars = ['PATH', 'LD_LIBRARY_PATH', 'PYTHONPATH', 'VISA_LIBRARY']
+        for var in env_vars:
+            if var in os.environ:
+                result["environment"][var] = os.environ[var]
+                
+        # Check for PyVISA version
+        result["diagnostics"]["pyvisa_version"] = pyvisa.__version__
+        
+        # Try PyVISA-py backend
+        try:
+            rm_py = pyvisa.ResourceManager('@py')
+            result["available_backends"].append("pyvisa-py")
+            
+            try:
+                resources_py = rm_py.list_resources()
+                if resources_py:
+                    result["resources"].extend(resources_py)
+                    result["diagnostics"]["pyvisa_py_resources"] = list(resources_py)
+                else:
+                    result["diagnostics"]["pyvisa_py_resources"] = "No resources found"
+            except Exception as e:
+                result["diagnostics"]["pyvisa_py_error"] = str(e)
+        except Exception as e:
+            result["diagnostics"]["pyvisa_py_backend_error"] = str(e)
+            
+        # Try NI-VISA backend
+        try:
+            rm_ni = pyvisa.ResourceManager("")
+            result["available_backends"].append("ni-visa")
+            
+            try:
+                resources_ni = rm_ni.list_resources()
+                if resources_ni:
+                    result["resources"].extend(resources_ni)
+                    result["diagnostics"]["ni_resources"] = list(resources_ni)
+                else:
+                    result["diagnostics"]["ni_resources"] = "No resources found"
+            except Exception as e:
+                result["diagnostics"]["ni_resources_error"] = str(e)
+                
+        except Exception as e:
+            result["diagnostics"]["ni_backend_error"] = str(e)
+            
+        return result
+
+    @staticmethod
+    def get_windows_specific_resources():
+        """
+        Check specifically for Windows VISA resources
+        This helps in environments where the app is developed in Linux but run on Windows
+        """
+        import sys
+        import pyvisa
+        
+        windows_results = {
+            "resources": [],
+            "is_windows": sys.platform.startswith('win'),
+            "backends_tried": []
+        }
+        
+        if not sys.platform.startswith('win'):
+            windows_results["message"] = "Not running on Windows"
+            return windows_results
+            
+        # Windows often works best with the default backend
+        try:
+            windows_results["backends_tried"].append("default")
+            rm = pyvisa.ResourceManager()
+            resources = rm.list_resources()
+            if resources:
+                windows_results["resources"].extend(resources)
+                windows_results["default_backend_ok"] = True
+        except Exception as e:
+            windows_results["default_backend_error"] = str(e)
+        
+        # Some Windows setups require specific VISA implementations
+        visa_dlls = [
+            # NI-VISA paths
+            r"C:\\Windows\\System32\\visa32.dll",
+            r"C:\\Program Files\\IVI Foundation\\VISA\\Win64\\Bin\\visa32.dll",
+            r"C:\\Program Files (x86)\\IVI Foundation\\VISA\\WinNT\\Bin\\visa32.dll",
+            
+            # Keysight/Agilent VISA paths
+            r"C:\\Program Files (x86)\\IVI Foundation\\VISA\\WinNT\\agvisa\\agbin\\visa32.dll"
+        ]
+        
+        for dll_path in visa_dlls:
+            try:
+                windows_results["backends_tried"].append(dll_path)
+                rm = pyvisa.ResourceManager(dll_path)
+                resources = rm.list_resources()
+                if resources:
+                    windows_results["resources"].extend(resources)
+                    windows_results["working_dll"] = dll_path
+                    break
+            except Exception as e:
+                windows_results[f"error_{dll_path}"] = str(e)
+        
+        return windows_results
