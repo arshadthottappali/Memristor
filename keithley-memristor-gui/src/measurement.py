@@ -5,18 +5,20 @@ import pyvisa
 class Measurement:
     def __init__(self, instrument):
         self.instrument = instrument
+        self.voltages = []
+        self.currents = []
 
     def voltage_sweep(self, start_voltage, stop_voltage, step_voltage, delay):
-        voltages = np.arange(start_voltage, stop_voltage + step_voltage, step_voltage)
-        currents = []
+        self.voltages = np.arange(start_voltage, stop_voltage + step_voltage, step_voltage)
+        self.currents = []
 
-        for voltage in voltages:
+        for voltage in self.voltages:
             self.instrument.set_voltage(voltage)
             time.sleep(delay)
             current = self.instrument.measure_current()
-            currents.append(current)
+            self.currents.append(current)
 
-        return voltages, currents
+        return self.voltages, self.currents
 
     def validate_parameters(self, start_voltage, stop_voltage, step_voltage, delay):
         if not all(isinstance(param, (int, float)) for param in [start_voltage, stop_voltage, step_voltage, delay]):

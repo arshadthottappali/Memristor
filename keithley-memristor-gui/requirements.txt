@@ -1,4 +1,4 @@
 PyVISA
+pyvisa-py
 matplotlib
-tkinter
 numpy

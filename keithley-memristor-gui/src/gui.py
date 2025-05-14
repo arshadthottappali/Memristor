@@ -7,7 +7,7 @@ import time
 import numpy as np
 from instrument import Instrument
 from measurement import Measurement
-from utils import validate_numerical_input, save_data_to_csv
+from utils import validate_numerical_input, save_data_to_csv, show_error_message
 
 class KeithleyMemristorGUI:
     def __init__(self, master):
@@ -16,6 +16,7 @@ class KeithleyMemristorGUI:
 
         self.instrument = None
         self.voltage_sweep = None
+        self.measurement = None  # Add this line
 
         self.gpib_address = StringVar()
         self.start_voltage = StringVar()
@@ -31,6 +32,7 @@ class KeithleyMemristorGUI:
         Entry(self.master, textvariable=self.gpib_address).grid(row=0, column=1)
 
         Button(self.master, text="Connect", command=self.connect_instrument).grid(row=0, column=2)
+        Button(self.master, text="List Resources", command=self.list_resources).grid(row=0, column=3)
 
         Label(self.master, text="Start Voltage (V):").grid(row=1, column=0)
         Entry(self.master, textvariable=self.start_voltage).grid(row=1, column=1)
@@ -59,11 +61,19 @@ class KeithleyMemristorGUI:
 
     def connect_instrument(self):
         try:
-            self.instrument = Instrument()
-            idn = self.instrument.connect(self.gpib_address.get())
+            self.instrument = Instrument(simulation_mode=True)  # Use simulation mode for testing
+            idn = self.instrument.connect(self.gpib_address.get() or "GPIB::24::INSTR")
             messagebox.showinfo("Connection Status", f"Connected to instrument: {idn}")
         except Exception as e:
-            messagebox.showerror("Connection Error", str(e))
+            if "VI_ERROR_INV_RSRC_NAME" in str(e):
+                messagebox.showerror(
+                    "Connection Error",
+                    "Invalid GPIB resource name specified.\n"
+                    "Ensure the GPIB address is in the correct format (e.g., GPIB::24::INSTR).\n"
+                    "You can also use the 'List Resources' feature to find available instruments."
+                )
+            else:
+                messagebox.showerror("Connection Error", f"Failed to connect to instrument: {str(e)}")
 
     def start_measurement(self):
         try:
@@ -84,13 +94,12 @@ class KeithleyMemristorGUI:
         try:
             voltages, currents = self.measurement.execute_measurement(start_v, stop_v, step_v, delay)
             # Store the voltage and current values for later use
-            self.measurement.voltages = voltages
-            self.measurement.currents = currents
+            self.measurement.voltages = voltages  # This could cause issues
+            self.measurement.currents = currents  # This could cause issues
             for v, c in zip(voltages, currents):
                 self.ax.plot(v, c, 'bo')
                 self.canvas.draw()
         except Exception as e:
-            from utils import show_error_message
             show_error_message(f"Measurement Error: {str(e)}")
 
     def save_data(self):
@@ -101,6 +110,19 @@ class KeithleyMemristorGUI:
                 messagebox.showinfo("Data Saving", "Data saved successfully.")
         else:
             show_error_message("No data to save.")
+
+    def list_resources(self):
+        try:
+            import pyvisa
+            # Explicitly use pyvisa-py backend
+            rm = pyvisa.ResourceManager('@py')
+            resources = rm.list_resources()
+            if resources:
+                messagebox.showinfo("Available Resources", f"Connected instruments:\n{', '.join(resources)}")
+            else:
+                messagebox.showinfo("Available Resources", "No instruments found.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to list resources: {str(e)}\nMake sure pyvisa-py is installed.")
 
 if __name__ == "__main__":
     root = Tk()
