@@ -1,12 +1,12 @@
 import tkinter as tk
 from tkinter import messagebox
-from gui import ApplicationGUI
+from gui import KeithleyMemristorGUI
 
 def main():
     root = tk.Tk()
     root.title("Keithley Memristor GUI")
     
-    app = ApplicationGUI(root)
+    app = KeithleyMemristorGUI(root)
     
     try:
         root.mainloop()

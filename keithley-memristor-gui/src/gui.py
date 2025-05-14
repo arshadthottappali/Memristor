@@ -6,7 +6,7 @@ import threading
 import time
 import numpy as np
 from instrument import Instrument
-from measurement import VoltageSweep
+from measurement import Measurement
 from utils import validate_numerical_input, save_data_to_csv
 
 class KeithleyMemristorGUI:
@@ -83,10 +83,14 @@ class KeithleyMemristorGUI:
     def execute_measurement(self, start_v, stop_v, step_v, delay):
         try:
             voltages, currents = self.measurement.execute_measurement(start_v, stop_v, step_v, delay)
+            # Store the voltage and current values for later use
+            self.measurement.voltages = voltages
+            self.measurement.currents = currents
             for v, c in zip(voltages, currents):
                 self.ax.plot(v, c, 'bo')
                 self.canvas.draw()
         except Exception as e:
+            from utils import show_error_message
             show_error_message(f"Measurement Error: {str(e)}")
 
     def save_data(self):
